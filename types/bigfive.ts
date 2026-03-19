@@ -158,3 +158,28 @@ export interface QuestionSetMetadata {
   /** License information */
   license: string;
 }
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Determine the score level based on normalized score (0-100)
+ *
+ * Classification:
+ * - low: 0-35
+ * - neutral: 36-64
+ * - high: 65-100
+ *
+ * @param normalizedScore Score in 0-100 range
+ * @returns Score level classification
+ */
+export function getScoreLevel(normalizedScore: number): ScoreLevel {
+  if (normalizedScore <= 35) {
+    return 'low'
+  } else if (normalizedScore >= 65) {
+    return 'high'
+  } else {
+    return 'neutral'
+  }
+}

@@ -15,24 +15,28 @@ export const bigFiveQuestions: BigFiveQuestion[] = [
     text: '初対面の人とでも気軽に話せる',
     dimension: 'extraversion',
     reversed: false,
+    facet: 1,
   },
   {
     id: 2,
     text: '大勢の中にいると疲れてしまう',
     dimension: 'extraversion',
     reversed: true,
+    facet: 1,
   },
   {
     id: 3,
     text: '積極的に人と関わることが好きだ',
     dimension: 'extraversion',
     reversed: false,
+    facet: 2,
   },
   {
     id: 4,
     text: '一人で過ごす時間を大切にしている',
     dimension: 'extraversion',
     reversed: true,
+    facet: 2,
   },
 
   // 協調性 (Agreeableness) - 4問
@@ -41,24 +45,28 @@ export const bigFiveQuestions: BigFiveQuestion[] = [
     text: '他人の気持ちを理解しようと努める',
     dimension: 'agreeableness',
     reversed: false,
+    facet: 1,
   },
   {
     id: 6,
     text: '人と意見が対立することが多い',
     dimension: 'agreeableness',
     reversed: true,
+    facet: 1,
   },
   {
     id: 7,
     text: '困っている人を見ると助けたくなる',
     dimension: 'agreeableness',
     reversed: false,
+    facet: 2,
   },
   {
     id: 8,
     text: '自分の意見を曲げないことが多い',
     dimension: 'agreeableness',
     reversed: true,
+    facet: 2,
   },
 
   // 誠実性 (Conscientiousness) - 4問
@@ -67,24 +75,28 @@ export const bigFiveQuestions: BigFiveQuestion[] = [
     text: '計画を立てて物事を進めることが多い',
     dimension: 'conscientiousness',
     reversed: false,
+    facet: 1,
   },
   {
     id: 10,
     text: '締め切りギリギリまで手をつけないことがある',
     dimension: 'conscientiousness',
     reversed: true,
+    facet: 1,
   },
   {
     id: 11,
     text: '約束や期限はきちんと守る',
     dimension: 'conscientiousness',
     reversed: false,
+    facet: 2,
   },
   {
     id: 12,
     text: '整理整頓が苦手だ',
     dimension: 'conscientiousness',
     reversed: true,
+    facet: 2,
   },
 
   // 神経症傾向 (Neuroticism) - 4問
@@ -93,24 +105,28 @@ export const bigFiveQuestions: BigFiveQuestion[] = [
     text: '小さなことで不安になることがある',
     dimension: 'neuroticism',
     reversed: false,
+    facet: 1,
   },
   {
     id: 14,
     text: 'ストレスを感じてもすぐに立ち直れる',
     dimension: 'neuroticism',
     reversed: true,
+    facet: 1,
   },
   {
     id: 15,
     text: '心配性だと思う',
     dimension: 'neuroticism',
     reversed: false,
+    facet: 2,
   },
   {
     id: 16,
     text: '気分の浮き沈みが少ない',
     dimension: 'neuroticism',
     reversed: true,
+    facet: 2,
   },
 
   // 開放性 (Openness) - 4問
@@ -119,24 +135,28 @@ export const bigFiveQuestions: BigFiveQuestion[] = [
     text: '新しいことに挑戦するのが好きだ',
     dimension: 'openness',
     reversed: false,
+    facet: 1,
   },
   {
     id: 18,
     text: '慣れ親しんだやり方を変えたくない',
     dimension: 'openness',
     reversed: true,
+    facet: 1,
   },
   {
     id: 19,
     text: '芸術や文化に興味がある',
     dimension: 'openness',
     reversed: false,
+    facet: 2,
   },
   {
     id: 20,
     text: '抽象的な議論よりも具体的な話が好きだ',
     dimension: 'openness',
     reversed: true,
+    facet: 2,
   },
 ]
 
