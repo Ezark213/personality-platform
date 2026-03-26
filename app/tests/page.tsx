@@ -13,15 +13,15 @@ const tests = [
     status: "available"
   },
   {
-    id: "big-five",
+    id: "bigfive",
     title: "ビッグファイブ診断",
     description: "5つの性格因子であなたを分析",
     longDescription: "開放性、誠実性、外向性、協調性、神経症傾向の5つの因子から、あなたの性格を科学的に分析します。",
     color: "from-blue-500 to-cyan-500",
     icon: "📊",
-    questions: 50,
-    duration: "約12分",
-    status: "coming-soon"
+    questions: 20,
+    duration: "約5分",
+    status: "available"
   },
   {
     id: "love-type",
@@ -30,9 +30,9 @@ const tests = [
     longDescription: "恋愛におけるあなたの行動パターン、コミュニケーションスタイル、相性の良いタイプを診断します。",
     color: "from-red-500 to-orange-500",
     icon: "💕",
-    questions: 30,
-    duration: "約8分",
-    status: "coming-soon"
+    questions: 20,
+    duration: "約5分",
+    status: "available"
   },
   {
     id: "aptitude",
@@ -41,9 +41,9 @@ const tests = [
     longDescription: "興味、能力、価値観から、あなたに合った職業や働き方を診断します。",
     color: "from-green-500 to-teal-500",
     icon: "💼",
-    questions: 45,
-    duration: "約15分",
-    status: "coming-soon"
+    questions: 20,
+    duration: "約5分",
+    status: "available"
   }
 ];
 

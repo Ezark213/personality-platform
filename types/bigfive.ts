@@ -183,3 +183,9 @@ export function getScoreLevel(normalizedScore: number): ScoreLevel {
     return 'neutral'
   }
 }
+
+// ============================================================================
+// Re-exports from other modules
+// ============================================================================
+
+export type { BigFiveType } from '@/data/tests/bigfive-types'

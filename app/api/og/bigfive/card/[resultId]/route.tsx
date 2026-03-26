@@ -14,6 +14,7 @@ import { ImageResponse } from '@vercel/og'
 import { NextRequest } from 'next/server'
 import type { BigFiveResult, BigFiveDimension } from '@/types/bigfive'
 import { classifyType } from '@/lib/tests/bigfive-type-classifier'
+import { decodeResultData } from '@/lib/utils/result-storage'
 
 export const runtime = 'edge'
 
@@ -73,23 +74,28 @@ export async function GET(
 ) {
   try {
     const { resultId } = await params
+    const { searchParams } = new URL(request.url)
+    const encodedData = searchParams.get('data')
 
-    // TODO: Fetch actual result from database (Iteration-05)
-    // For now, use mock data
-    const mockResult: BigFiveResult = {
-      scores: {
-        neuroticism: { average: 2.5, normalized: 50, level: 'neutral', questionCount: 4 },
-        extraversion: { average: 4.2, normalized: 84, level: 'high', questionCount: 4 },
-        openness: { average: 3.8, normalized: 76, level: 'high', questionCount: 4 },
-        agreeableness: { average: 3.5, normalized: 70, level: 'high', questionCount: 4 },
-        conscientiousness: { average: 3.2, normalized: 64, level: 'neutral', questionCount: 4 }
-      },
-      totalQuestions: 20,
-      completedAt: new Date()
+    // Validate data parameter
+    if (!encodedData) {
+      return new Response('Missing result data parameter', { status: 400 })
+    }
+
+    // Decode result data from URL parameter
+    let result: BigFiveResult
+    try {
+      const decoded = decodeResultData(encodedData)
+      result = decoded.result
+    } catch (error) {
+      return new Response(
+        `Invalid result data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { status: 400 }
+      )
     }
 
     // Classify the result into a personality type
-    const type = classifyType(mockResult)
+    const type = classifyType(result)
 
     // Get gradient colors based on type
     const gradient = getGradientColors(type.primaryDimension, type.level)
