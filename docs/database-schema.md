@@ -38,6 +38,7 @@ model User {
   testSessions        TestSession[]
   testResults         TestResult[]
   aiConversations     AiConversation[]
+  aiInsights          AiInsight[]           // ブックマークされたAIインサイト
   weeklySummaries     WeeklySummary[]
   actionExperiments   ActionExperiment[]
   shareCards          ShareCard[]
@@ -318,21 +319,40 @@ enum AiConversationStatus {
   ARCHIVED
 }
 
+enum AiConversationTheme {
+  CAREER         // キャリア・仕事
+  RELATIONSHIPS  // 人間関係
+  GROWTH         // 自己理解・成長
+}
+
 model AiConversation {
   id        String               @id @default(cuid())
   userId    String
   user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   title     String?              // 会話のタイトル（自動生成 or ユーザー編集）
+  theme     AiConversationTheme  // 相談テーマ
   status    AiConversationStatus @default(ACTIVE)
+
+  // 会話要約（5往復ごとに生成、トークン削減60-70%）
+  summary   String?              @db.Text
+  summaryAt DateTime?            // 最後に要約した日時
+
+  // システムプロンプト情報（デバッグ用）
+  systemPrompt String?           @db.Text
+
+  // BigFiveスナップショット（会話開始時のスコア）
+  bigFiveSnapshot Json?          // { openness: X, conscientiousness: X, ... }
 
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
   // Relations
   messages  AiMessage[]
+  insights  AiInsight[]          // ブックマークされたインサイト
 
   @@index([userId])
+  @@index([theme])
   @@index([status])
   @@index([updatedAt])
 }
@@ -351,13 +371,55 @@ model AiMessage {
   role           AiMessageRole
   content        String          @db.Text
 
+  // サジェスチョンチップ（AIメッセージの場合）
+  suggestionChips Json?          // string[] - 次のユーザー入力候補
+
   // メタデータ（プロンプト設計・トークン数等）
-  metadata       Json?
+  metadata       Json?           // { tokenCount: number, model: string, latency: number }
+
+  // 要約フラグ（このメッセージが要約に含まれたか）
+  isSummarized   Boolean         @default(false)
 
   createdAt      DateTime        @default(now())
 
+  // Relations
+  insights       AiInsight[]     // このメッセージからブックマークされたインサイト
+
   @@index([conversationId])
   @@index([createdAt])
+  @@index([isSummarized])
+}
+
+// ========================================
+// AI Insights (Bookmarked Messages)
+// ========================================
+
+model AiInsight {
+  id             String               @id @default(cuid())
+  userId         String
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation   AiConversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  messageId      String
+  message        AiMessage            @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  // インサイトテキスト（メッセージの一部またはユーザー編集可能）
+  text           String               @db.Text
+
+  // カテゴリ（自動分類 or ユーザー選択）
+  category       AiConversationTheme?
+
+  // タグ（ユーザー追加可能）
+  tags           String[]
+
+  savedAt        DateTime             @default(now())
+
+  @@index([userId])
+  @@index([conversationId])
+  @@index([category])
+  @@index([savedAt])
 }
 
 // ========================================

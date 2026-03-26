@@ -31,11 +31,14 @@ Next.js App Router (Route Handlers + Server Actions) を前提としたAPI設計
 
 | メソッド | エンドポイント | 説明 |
 |---------|--------------|------|
-| POST | `/api/ai/chat` | AI相談（ストリーミング） |
+| POST | `/api/ai/chat` | AI相談（Gemini 2.5 Flash、ストリーミング） |
 | GET | `/api/ai/conversations` | 会話一覧取得 |
 | GET | `/api/ai/conversations/[id]` | 会話詳細取得 |
-| POST | `/api/ai/weekly-summary` | 週次サマリー生成 |
-| POST | `/api/ai/action-experiment` | 今週の実験の提案/振り返り |
+| POST | `/api/ai/conversations/[id]/summarize` | 会話要約生成（5往復ごと、トークン削減） |
+| POST | `/api/ai/insights/save` | インサイトブックマーク保存 |
+| GET | `/api/ai/insights` | 保存済みインサイト一覧取得 |
+| POST | `/api/ai/weekly-summary` | 週次サマリー生成（Phase 2）|
+| POST | `/api/ai/action-experiment` | 今週の実験の提案/振り返り（Phase 2）|
 
 ### 課金系
 
@@ -356,13 +359,15 @@ sequenceDiagram
 
 ### POST `/api/ai/chat`
 
-**説明**：AI相談（ストリーミング対応）
+**説明**：AI相談（Gemini 2.5 Flash、ストリーミング対応）
 
 **リクエスト**：
 ```typescript
 {
   conversationId?: string  // 既存会話に追加する場合
   message: string          // ユーザーメッセージ
+  theme: 'career' | 'relationships' | 'growth'  // 相談テーマ
+  suggestionChip?: string  // サジェスチョンチップから送信した場合
 }
 ```
 
@@ -373,38 +378,109 @@ sequenceDiagram
 // イベント例：
 data: {"type":"token","content":"こんにちは"}
 data: {"type":"token","content":"！"}
-data: {"type":"done","conversationId":"abc123","messageId":"msg456"}
+data: {"type":"done","conversationId":"abc123","messageId":"msg456","suggestionChips":["次は...","もっと..."]}
 ```
 
-**実装**：Vercel AI SDK使用
+**実装**：Gemini 2.5 Flash使用（5層プロンプト構造）
 
 ```typescript
 // app/api/ai/chat/route.ts
-import { streamText } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { buildSystemPrompt } from '@/lib/ai/prompt-builder'
 
 export async function POST(req: Request) {
-  const { conversationId, message } = await req.json()
+  const { conversationId, message, theme } = await req.json()
+  const userId = await getCurrentUserId()
 
-  // システムプロンプト設定
-  const systemPrompt = await buildSystemPrompt(userId)
+  // BigFiveスコア取得
+  const bigFiveScores = await getBigFiveScores(userId)
+  const personalityType = await getPersonalityType(userId)
+
+  // 5層システムプロンプト構築
+  const systemPrompt = buildSystemPrompt({
+    bigFiveScores,
+    personalityType,
+    theme
+  })
+
+  // Gemini API初期化
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    systemInstruction: systemPrompt
+  })
 
   // 会話履歴取得
   const history = conversationId
     ? await getConversationHistory(conversationId)
     : []
 
-  // ストリーミング
-  const result = await streamText({
-    model: anthropic('claude-3-5-sonnet-20241022'),
-    system: systemPrompt,
-    messages: [
-      ...history,
-      { role: 'user', content: message },
-    ],
-  })
+  // 会話開始（ストリーミング）
+  const chat = model.startChat({ history })
+  const result = await chat.sendMessageStream(message)
 
-  return result.toAIStreamResponse()
+  // ストリーミングレスポンス
+  return new Response(
+    new ReadableStream({
+      async start(controller) {
+        for await (const chunk of result.stream) {
+          const text = chunk.text()
+          controller.enqueue(
+            new TextEncoder().encode(`data: ${JSON.stringify({ type: 'token', content: text })}\n\n`)
+          )
+        }
+        controller.enqueue(
+          new TextEncoder().encode(`data: ${JSON.stringify({ type: 'done', conversationId, messageId })}\n\n`)
+        )
+        controller.close()
+      }
+    }),
+    {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    }
+  )
+}
+```
+
+**システムプロンプト構造（5層）**：
+```typescript
+// lib/ai/prompt-builder.ts
+export function buildSystemPrompt(params: {
+  bigFiveScores: BigFiveScores
+  personalityType: string
+  theme: 'career' | 'relationships' | 'growth'
+}): string {
+  // Layer 1: ROLE
+  const role = `あなたはココロ、若い大人向けの温かく洞察力のある性格コンサルタントです。
+  丁寧でカジュアルな日本語（です/ます + 温かさ）で話します。
+  顔文字を自然に使います。支援的な先輩であり、講師ではありません。`
+
+  // Layer 2: USER CONTEXT
+  const context = `ユーザーのBigFiveスコア:
+  開放性 ${params.bigFiveScores.openness}/100
+  誠実性 ${params.bigFiveScores.conscientiousness}/100
+  外向性 ${params.bigFiveScores.extraversion}/100
+  協調性 ${params.bigFiveScores.agreeableness}/100
+  神経症傾向 ${params.bigFiveScores.neuroticism}/100
+  性格タイプ: ${params.personalityType}`
+
+  // Layer 3: ADAPTIVE STYLE
+  const style = buildAdaptiveStyle(params.bigFiveScores)
+
+  // Layer 4: THEME CONTEXT
+  const themeContext = getThemeContext(params.theme)
+
+  // Layer 5: SAFETY
+  const safety = `クライシス検出キーワード: 「死にたい」「消えたい」など
+  → すぐにクライシスリソースを提供（いのちの電話: 0120-783-556）
+  診断はしない。人生を変える指示は出さない。
+  アドバイスは探索としてフレーミングする。`
+
+  return `${role}\n\n${context}\n\n${style}\n\n${themeContext}\n\n${safety}`
 }
 ```
 
@@ -412,9 +488,109 @@ export async function POST(req: Request) {
 
 **レート制限**：
 - FREE: 月3回
-- PLUS: 月20回
-- PRO: 月60回
-- クレジット: 都度消費
+- PLUS/Standard: 無制限（API制限内）
+- PRO/Premium: 優先キュー + Flash vs Flash-Lite
+
+**Gemini API制限**（無料枠）：
+- Flash: ~250 RPD, 10 RPM
+- Flash-Lite: 1,000 RPD, 15 RPM
+- 有料Tier 1: ~1,500 RPD, $0.30/100万トークン
+
+**会話履歴管理**：
+- 5往復ごとに要約してトークン削減（60-70%削減）
+- `/api/ai/conversations/[id]/summarize` で要約生成
+
+---
+
+### POST `/api/ai/conversations/[id]/summarize`
+
+**説明**：会話要約生成（トークン削減のため、5往復ごとに実行）
+
+**リクエスト**：
+```typescript
+// パスパラメータ
+conversationId: string
+
+// ボディ
+{
+  lastNMessages?: number  // デフォルト: 10（5往復）
+}
+```
+
+**レスポンス**：
+```typescript
+{
+  summary: string
+  originalTokens: number
+  summarizedTokens: number
+  reductionPercent: number  // 削減率（例: 65%）
+}
+```
+
+**処理フロー**：
+1. 最新N件のメッセージを取得
+2. Gemini Flash-Liteで要約生成（コスト削減）
+3. 元のメッセージを要約で置き換え
+4. トークン数を比較してレスポンス
+
+**認証**：必須（Clerk）
+
+---
+
+### POST `/api/ai/insights/save`
+
+**説明**：重要なAIメッセージをインサイトとしてブックマーク
+
+**リクエスト**：
+```typescript
+{
+  messageId: string
+  conversationId: string
+  insightText: string
+  category?: 'career' | 'relationships' | 'growth'
+}
+```
+
+**レスポンス**：
+```typescript
+{
+  insightId: string
+  savedAt: string
+}
+```
+
+**認証**：必須（Clerk）
+
+---
+
+### GET `/api/ai/insights`
+
+**説明**：保存済みインサイト一覧取得
+
+**クエリパラメータ**：
+```typescript
+{
+  category?: 'career' | 'relationships' | 'growth'
+  limit?: number  // デフォルト: 20
+  offset?: number  // デフォルト: 0
+}
+```
+
+**レスポンス**：
+```typescript
+{
+  insights: {
+    id: string
+    text: string
+    category: string
+    conversationId: string
+    savedAt: string
+  }[]
+  total: number
+}
+```
+
+**認証**：必須（Clerk）
 
 ---
 
