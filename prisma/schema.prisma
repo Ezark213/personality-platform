@@ -1,0 +1,120 @@
+// Prisma Schema for Personality Platform
+// Generated: 2026-03-26
+// Iteration-04 Phase 1: データベース基盤構築
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// User & Auth
+// ========================================
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique  // Clerk user ID
+  email     String   @unique
+  name      String?
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  testResults     TestResult[]
+  aiConversations AiConversation[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+// ========================================
+// Tests & Results
+// ========================================
+
+enum TestType {
+  BIGFIVE
+  APTITUDE
+  LOVE_TYPE
+}
+
+model TestResult {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testType  TestType
+  scores    Json     // BigFive: { neuroticism: {...}, extraversion: {...}, ... }
+  typeId    String   // BigFive: "15type-id", Aptitude: "aptitude-type-id"
+
+  // Metadata
+  ipAddress String?
+  userAgent String?  @db.Text
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  aiConversations AiConversation[]
+
+  @@index([userId])
+  @@index([testType])
+  @@index([createdAt])
+}
+
+// ========================================
+// AI Consultation
+// ========================================
+
+enum AiConversationTheme {
+  CAREER
+  RELATIONSHIPS
+  SELF_GROWTH
+}
+
+model AiConversation {
+  id             String                @id @default(cuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  testResultId   String?
+  testResult     TestResult?           @relation(fields: [testResultId], references: [id], onDelete: SetNull)
+
+  theme          AiConversationTheme
+  title          String?               // 会話のタイトル（自動生成 or ユーザー設定）
+  summary        String?               @db.Text
+
+  // BigFiveスコアのスナップショット（会話作成時点のスコア）
+  bigFiveSnapshot Json?
+
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  // Relations
+  messages       AiMessage[]
+
+  @@index([userId])
+  @@index([testResultId])
+  @@index([createdAt])
+}
+
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role           String         // 'user' or 'assistant'
+  content        String         @db.Text
+
+  // Metadata
+  tokenCount     Int?
+  model          String?        // 'gemini-2.5-flash'
+
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
