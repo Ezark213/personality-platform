@@ -31,7 +31,7 @@ const GENERATION_CONFIG = {
   temperature: 0.7,
   topP: 0.95,
   topK: 40,
-  maxOutputTokens: 1024,
+  maxOutputTokens: 8000, // AI相談で長い返信を可能にするため8000に設定（最大8192）
 };
 
 const SAFETY_SETTINGS = [
@@ -77,9 +77,19 @@ export interface ChatMessage {
 
 /**
  * チャット履歴をGemini形式に変換
+ *
+ * Note: Gemini APIは履歴の最初のメッセージが必ず'user'ロールでなければならない。
+ * そのため、履歴の先頭が'assistant'の場合はスキップする。
  */
 function convertToGeminiHistory(messages: ChatMessage[]) {
-  return messages.map((msg) => ({
+  // 最初のメッセージがassistantの場合は除外（UIの初期挨拶メッセージなど）
+  let validMessages = messages;
+  if (messages.length > 0 && messages[0].role === 'assistant') {
+    validMessages = messages.slice(1);
+  }
+
+  // Gemini形式に変換
+  return validMessages.map((msg) => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }],
   }));
